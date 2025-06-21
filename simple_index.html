@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Essay Critic - AI Text Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #3b82f6 100%);
+            min-height: 100vh;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #60a5fa;
+            background: rgba(96, 165, 250, 0.1);
+        }
+        .selection-box {
+            border: 2px solid #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-8">Essay Critic</h1>
+        
+        <!-- Tabs -->
+        <div class="flex justify-center mb-8">
+            <button onclick="showTab('text')" class="tab-btn px-6 py-3 bg-blue-600 rounded-l-lg">Text</button>
+            <button onclick="showTab('file')" class="tab-btn px-6 py-3 bg-blue-600">File</button>
+            <button onclick="showTab('image')" class="tab-btn px-6 py-3 bg-blue-600 rounded-r-lg">Image</button>
+        </div>
+
+        <!-- Text Analysis -->
+        <div id="text-tab" class="tab-content">
+            <div class="card rounded-lg p-6 max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-4">Text Analysis</h2>
+                <textarea id="textInput" rows="8" placeholder="Enter your text here..." 
+                          class="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-300"></textarea>
+                <div class="mt-4 flex gap-4">
+                    <button onclick="analyzeText()" class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700">Analyze</button>
+                    <button onclick="summarizeText()" class="px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700">Summarize</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Analysis -->
+        <div id="file-tab" class="tab-content hidden">
+            <div class="card rounded-lg p-6 max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-4">File Analysis</h2>
+                <div class="upload-area rounded-lg p-8 text-center" id="fileUploadArea">
+                    <input type="file" id="fileInput" accept=".txt,.pdf,.docx,.csv,.xlsx,.pptx,.md,.json,.html" class="hidden">
+                    <p class="mb-4">Drop files here or click to browse</p>
+                    <button onclick="document.getElementById('fileInput').click()" class="px-6 py-3 bg-blue-600 rounded-lg">Choose File</button>
+                </div>
+                <div class="mt-4 flex gap-4">
+                    <button onclick="analyzeFile()" class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700">Analyze</button>
+                    <button onclick="summarizeFile()" class="px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700">Summarize</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Analysis -->
+        <div id="image-tab" class="tab-content hidden">
+            <div class="card rounded-lg p-6 max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-4">Image Analysis</h2>
+                <div class="upload-area rounded-lg p-8 text-center" id="imageUploadArea">
+                    <input type="file" id="imageInput" accept="image/*" class="hidden">
+                    <p class="mb-4">Drop image here or click to browse</p>
+                    <button onclick="document.getElementById('imageInput').click()" class="px-6 py-3 bg-blue-600 rounded-lg">Choose Image</button>
+                </div>
+                <div id="imageCanvasContainer" class="hidden mt-4">
+                    <canvas id="imageCanvas" class="border border-white/20 rounded-lg max-w-full"></canvas>
+                    <div class="mt-4 flex gap-4">
+                        <button onclick="analyzeSelectedArea()" class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700">Analyze Selection</button>
+                        <button onclick="analyzeFullImage()" class="px-6 py-3 bg-green-600 rounded-lg hover:bg-green-700">Analyze Full Image</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden mt-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="card rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Summary</h3>
+                    <div id="summaryResult"></div>
+                </div>
+                <div class="card rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Critique</h3>
+                    <div id="critiqueResult"></div>
+                </div>
+                <div class="card rounded-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Improvements</h3>
+                    <div id="improvementsResult"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div id="error" class="hidden mt-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-200"></div>
+    </div>
+
+    <script>
+        let selectedCategory = 'academic';
+        let imageData = null;
+        let canvas = null;
+        let ctx = null;
+        let isDrawing = false;
+        let startX, startY;
+        let selectionBox = null;
+
+        // Setup event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            setupFileUpload();
+            setupImageUpload();
+        });
+
+        function setupFileUpload() {
+            const fileUploadArea = document.getElementById('fileUploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            fileUploadArea.addEventListener('click', () => fileInput.click());
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.add('border-blue-400');
+            });
+            fileUploadArea.addEventListener('dragleave', () => {
+                fileUploadArea.classList.remove('border-blue-400');
+            });
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.remove('border-blue-400');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                }
+            });
+        }
+
+        function setupImageUpload() {
+            const imageUploadArea = document.getElementById('imageUploadArea');
+            const imageInput = document.getElementById('imageInput');
+            
+            imageUploadArea.addEventListener('click', () => imageInput.click());
+            imageUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                imageUploadArea.classList.add('border-blue-400');
+            });
+            imageUploadArea.addEventListener('dragleave', () => {
+                imageUploadArea.classList.remove('border-blue-400');
+            });
+            imageUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                imageUploadArea.classList.remove('border-blue-400');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    imageInput.files = files;
+                    handleImageUpload(files[0]);
+                }
+            });
+            
+            imageInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleImageUpload(e.target.files[0]);
+                }
+            });
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            
+            // Update button styles
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-700');
+                btn.classList.add('bg-blue-600');
+            });
+            event.target.classList.remove('bg-blue-600');
+            event.target.classList.add('bg-blue-700');
+        }
+
+        function handleImageUpload(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                imageData = e.target.result;
+                
+                const canvas = document.getElementById('imageCanvas');
+                const img = new Image();
+                
+                img.onload = function() {
+                    const maxWidth = 600;
+                    const maxHeight = 400;
+                    let { width, height } = img;
+                    
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height;
+                        height = maxHeight;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    setupCanvasSelection();
+                    document.getElementById('imageCanvasContainer').classList.remove('hidden');
+                };
+                
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setupCanvasSelection() {
+            canvas = document.getElementById('imageCanvas');
+            
+            canvas.addEventListener('mousedown', startSelection);
+            canvas.addEventListener('mousemove', updateSelection);
+            canvas.addEventListener('mouseup', endSelection);
+        }
+
+        function startSelection(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+            
+            if (selectionBox) {
+                selectionBox.remove();
+                selectionBox = null;
+            }
+        }
+
+        function updateSelection(e) {
+            if (!isDrawing) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+                ctx.setLineDash([]);
+                
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+                ctx.fillRect(startX, startY, currentX - startX, currentY - startY);
+            };
+            img.src = imageData;
+        }
+
+        function endSelection(e) {
+            isDrawing = false;
+            const rect = canvas.getBoundingClientRect();
+            const endX = e.clientX - rect.left;
+            const endY = e.clientY - rect.top;
+            
+            selectionBox = document.createElement('div');
+            selectionBox.className = 'selection-box absolute';
+            selectionBox.style.left = Math.min(startX, endX) + 'px';
+            selectionBox.style.top = Math.min(startY, endY) + 'px';
+            selectionBox.style.width = Math.abs(endX - startX) + 'px';
+            selectionBox.style.height = Math.abs(endY - startY) + 'px';
+            
+            document.querySelector('.image-canvas-container').appendChild(selectionBox);
+        }
+
+        async function analyzeText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showError('Please enter some text to analyze.');
+                return;
+            }
+            
+            showResults();
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, category: selectedCategory })
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displayResults(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        async function summarizeText() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showError('Please enter some text to summarize.');
+                return;
+            }
+            
+            showResults();
+            try {
+                const response = await fetch('/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, category: selectedCategory })
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displaySummaryOnly(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        async function analyzeFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files.length) {
+                showError('Please select a file to analyze.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('category', selectedCategory);
+            
+            showResults();
+            try {
+                const response = await fetch('/analyze-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displayResults(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        async function summarizeFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files.length) {
+                showError('Please select a file to summarize.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('category', selectedCategory);
+            
+            showResults();
+            try {
+                const response = await fetch('/summarize-file', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displaySummaryOnly(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        async function analyzeSelectedArea() {
+            if (!selectionBox) {
+                showError('Please select an area on the image first.');
+                return;
+            }
+            
+            const bounds = {
+                x1: parseInt(selectionBox.style.left),
+                y1: parseInt(selectionBox.style.top),
+                x2: parseInt(selectionBox.style.left) + parseInt(selectionBox.style.width),
+                y2: parseInt(selectionBox.style.top) + parseInt(selectionBox.style.height)
+            };
+            
+            showResults();
+            try {
+                const response = await fetch('/analyze-image-selection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_data: imageData,
+                        selection_bounds: bounds,
+                        category: selectedCategory
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displayResults(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        async function analyzeFullImage() {
+            if (!imageData) {
+                showError('Please upload an image first.');
+                return;
+            }
+            
+            showResults();
+            try {
+                const response = await fetch('/analyze-image-selection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_data: imageData,
+                        selection_bounds: { x1: 0, y1: 0, x2: canvas.width, y2: canvas.height },
+                        category: selectedCategory
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                
+                displayResults(data);
+            } catch (error) {
+                showError(error.message);
+                hideResults();
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('summaryResult').innerHTML = data.summary;
+            document.getElementById('critiqueResult').innerHTML = data.critique;
+            document.getElementById('improvementsResult').innerHTML = data.improved_summary;
+        }
+
+        function displaySummaryOnly(data) {
+            document.getElementById('summaryResult').innerHTML = data.summary;
+            document.getElementById('critiqueResult').innerHTML = '<p class="text-gray-400">Summary only mode</p>';
+            document.getElementById('improvementsResult').innerHTML = '<p class="text-gray-400">Summary only mode</p>';
+        }
+
+        function showResults() {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('error').classList.add('hidden');
+        }
+
+        function hideResults() {
+            document.getElementById('results').classList.add('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('error').textContent = message;
+            document.getElementById('error').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html> 

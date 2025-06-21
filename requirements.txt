@@ -1,0 +1,13 @@
+# flask==2.3.3
+# flask-cors==4.0.0
+streamlit
+python-dotenv==1.0.0
+openai==0.28.1
+PyPDF2==3.0.1
+python-docx==0.8.11
+numpy==1.24.3
+pandas==1.5.3
+openpyxl==3.1.2
+Werkzeug==2.3.7
+Pillow==10.0.0
+requests==2.31.0 

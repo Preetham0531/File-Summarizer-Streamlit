@@ -1,0 +1,18 @@
+# Essay Critic - API Configuration
+# Copy this file to .env and fill in your API keys
+
+# Required: OpenAI API Key (for text analysis, summaries, critiques, and improvements)
+# Get your key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional: Google Cloud Vision API (for image text extraction)
+# Get your key from: https://console.cloud.google.com/apis/credentials
+GOOGLE_CLOUD_API_KEY=your_google_cloud_api_key_here
+
+# Optional: Azure Computer Vision API (alternative to Google Cloud Vision)
+# Get your key from: https://portal.azure.com/#create/Microsoft.CognitiveServicesComputerVision
+AZURE_VISION_KEY=your_azure_vision_key_here
+AZURE_VISION_ENDPOINT=https://your-resource-name.cognitiveservices.azure.com/
+
+# Note: You only need ONE OCR service (Google Cloud Vision OR Azure Computer Vision)
+# If you don't configure any OCR service, image analysis features will be disabled 
