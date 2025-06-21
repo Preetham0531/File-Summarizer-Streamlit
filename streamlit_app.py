@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit.errors import StreamlitSecretNotFoundError
 import os
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import PyPDF2
 import docx
 import pandas as pd
@@ -15,10 +15,12 @@ load_dotenv()
 # Configure APIs - Use Streamlit secrets for deployed apps, otherwise use .env
 try:
     # Try to get the secret from Streamlit's secrets management
-    openai.api_key = st.secrets["OPENAI_API_KEY"]
+    api_key = st.secrets["OPENAI_API_KEY"]
 except (StreamlitSecretNotFoundError, KeyError):
     # If the secret is not found (e.g., running locally), use the environment variable
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
+
+client = OpenAI(api_key=api_key)
 
 # Prompts for text-based analysis
 CATEGORY_PROMPTS = {
@@ -116,7 +118,7 @@ if section == "Text Analysis":
     category = st.selectbox("Select Category", categories, index=0)
     text = st.text_area("Paste your text here:", height=200)
     if st.button("Analyze Text", type="primary"):
-        if not openai.api_key:
+        if not api_key:
             st.error("OpenAI API key not configured. Please add OPENAI_API_KEY to your .env file or Streamlit secrets.")
         elif not text.strip():
             st.warning("Please enter some text to analyze.")
@@ -128,7 +130,7 @@ if section == "Text Analysis":
                     critique_prompt = get_prompt(category, 'critique')
                     improve_prompt = get_prompt(category, 'improve')
                     # Summary
-                    summary_response = openai.ChatCompletion.create(
+                    summary_response = client.chat.completions.create(
                         model="gpt-4",
                         messages=[
                             {"role": "system", "content": "You are a professional text analyst. Format your response with markdown. Keep summaries to 150 words."},
@@ -139,7 +141,7 @@ if section == "Text Analysis":
                     )
                     summary = summary_response.choices[0].message.content.strip()
                     # Critique
-                    critique_response = openai.ChatCompletion.create(
+                    critique_response = client.chat.completions.create(
                         model="gpt-4",
                         messages=[
                             {"role": "system", "content": "You are a professional text analyst. Format your response with markdown. Provide detailed, constructive critiques."},
@@ -150,7 +152,7 @@ if section == "Text Analysis":
                     )
                     critique = critique_response.choices[0].message.content.strip()
                     # Improvements
-                    improve_response = openai.ChatCompletion.create(
+                    improve_response = client.chat.completions.create(
                         model="gpt-4",
                         messages=[
                             {"role": "system", "content": "You are a professional text analyst. Format your response with markdown. Provide specific, actionable improvements."},
@@ -184,7 +186,7 @@ if section == "File Analysis":
             else:
                 st.text_area("Extracted Text (editable):", value=text_content, height=200, key="file_text_area")
                 if st.button("Analyze File", key="analyze_file_btn", type="primary"):
-                    if not openai.api_key:
+                    if not api_key:
                         st.error("OpenAI API key not configured. Please add OPENAI_API_KEY to your .env file or Streamlit secrets.")
                     else:
                         with st.spinner("Analyzing file content with GPT-4..."):
@@ -194,11 +196,11 @@ if section == "File Analysis":
                                 critique_prompt = get_prompt(category, 'critique')
                                 improve_prompt = get_prompt(category, 'improve')
                                 # Summary, Critique, and Improvement calls (similar to Text Analysis)
-                                summary_response = openai.ChatCompletion.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{summary_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=400)
+                                summary_response = client.chat.completions.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{summary_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=400)
                                 summary = summary_response.choices[0].message.content.strip()
-                                critique_response = openai.ChatCompletion.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{critique_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=800)
+                                critique_response = client.chat.completions.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{critique_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=800)
                                 critique = critique_response.choices[0].message.content.strip()
-                                improve_response = openai.ChatCompletion.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{improve_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=800)
+                                improve_response = client.chat.completions.create(model="gpt-4", messages=[{"role": "system", "content": "You are a professional text analyst..."}, {"role": "user", "content": f"{improve_prompt}\n\n{analysis_text}"}], temperature=0.7, max_tokens=800)
                                 improved_summary = improve_response.choices[0].message.content.strip()
                                 # Display results
                                 st.markdown("<div class='results'>", unsafe_allow_html=True)
